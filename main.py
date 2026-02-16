@@ -1,4 +1,3 @@
-from os import remove
 from fastapi import FastAPI, Request
 from pydantic import BaseModel
 from collections import defaultdict, deque
@@ -20,6 +19,9 @@ IP_WINDOW_SECONDS = 60
 IP_RATE_THRESHOLD = 8 # attempts per 60 seconds from same IP
 ip_attempts = defaultdict(deque) #{ip: deque ([datetime, datetime, ...])}
 
+# Signal C : Device consistency tracking
+known_devices = defaultdict(set) #{username: {user_agent_fingerprint}}
+
 def prune_old_attempts(ip: str, now: datetime) -> None:
     """Remove timestamps older than our time window."""
     cutoff = now - timedelta(seconds = IP_WINDOW_SECONDS)
@@ -28,22 +30,24 @@ def prune_old_attempts(ip: str, now: datetime) -> None:
     while q and q[0] < cutoff:
         q.popleft()
 
-def calculate_risk(ip: str, user_agent: str) -> tuple [int, list[str]]:
+def calculate_risk(ip: str, user_agent: str, username: str) -> tuple [int, list[str]]:
     """
     Returns (score, reasons)
     Implements: 
     - Signal A: IP login rate
     - Signal B: User-Agent sanity
+    - Signal C: Device consistency (new device detection)
     """
     now = datetime.utcnow()
+
+    score = 0
+    reasons = []
 
     # Signal A: IP Login rate (velocity)---
     prune_old_attempts(ip, now)
     ip_attempts[ip].append(now)
     attempts_in_window = len(ip_attempts[ip])
 
-    score = 0
-    reasons = []
     
     if attempts_in_window > IP_RATE_THRESHOLD:
         score += 10
@@ -56,12 +60,23 @@ def calculate_risk(ip: str, user_agent: str) -> tuple [int, list[str]]:
     if not ua:
         score += 5
         reasons.append("Missing User-Agent header")
+        ua_lower = ""
     else:
         ua_lower = ua.lower()
         if "curl" in ua_lower or "python" in ua_lower or "httpie" in ua_lower:
             score += 3
             reasons.append("Likely scripted User-Agent")
 
+#------------------------------------
+# Signal C: Device Consistency
+#----------------------------------
+#Simple MVP fingerprint = User-Agent String
+
+    if username and ua_lower :
+        if ua_lower not in known_devices[username]:
+            score += 5
+            reasons.append("New device/User-Agent detected for this user")
+            known_devices[username].add(ua_lower)
     return score, reasons
 
 def score_to_decision(score: int) -> str:
@@ -89,7 +104,7 @@ async def login(data: LoginRequest, request: Request):
     ip = request.client.host if request.client else "unknown"
     user_agent = request.headers.get("user-agent", "")
 
-    score, reasons = calculate_risk(ip=ip, user_agent = user_agent)
+    score, reasons = calculate_risk(ip=ip, user_agent = user_agent,username = data.username)
     decision = score_to_decision(score)
 
     #SQLite logging (MVP evidence)
