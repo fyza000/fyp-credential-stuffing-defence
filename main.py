@@ -139,7 +139,7 @@ async def login(data: LoginRequest, request: Request):
         "risk_score": score,
         "reasons": reasons,
         "decision": decision
- }
+    }
     
     return {
         "username": data.username,
