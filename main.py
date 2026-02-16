@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from pydantic import BaseModel
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
@@ -50,7 +50,7 @@ def calculate_risk(ip: str, user_agent: str, username: str) -> tuple [int, list[
 
     
     if attempts_in_window > IP_RATE_THRESHOLD:
-        score += 10
+        score += 15
         reasons.append(f"High IP velocity: {attempts_in_window} attempts/{IP_WINDOW_SECONDS}s")
 
     # Signal B: User-Agent sanity
@@ -107,7 +107,7 @@ async def login(data: LoginRequest, request: Request):
     score, reasons = calculate_risk(ip=ip, user_agent = user_agent,username = data.username)
     decision = score_to_decision(score)
 
-    #SQLite logging (MVP evidence)
+#SQLite logging (MVP evidence)
     log_event(
         username=data.username,
         ip=ip,
@@ -117,6 +117,30 @@ async def login(data: LoginRequest, request: Request):
         reasons = reasons,
     )
 
+#---------------------
+# Adaptive Mitigation Enfrocement
+# --------------------
+    if decision == "BLOCK":
+    #High-risk attempt: reject completely
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "message": "Blocked suspicious login attempt",
+                "risk_score": score,
+                "reasons": reasons
+                }
+        )  
+  
+    if decision == "CHALLENGE":
+    # Medium-risk attempt: require CAPTCHA (stub for MVP)
+        return {
+        "message": "Challenge required (CAPTCHA placeholder)",
+        "username": data.username,
+        "risk_score": score,
+        "reasons": reasons,
+        "decision": decision
+ }
+    
     return {
         "username": data.username,
         "ip_address": ip,
