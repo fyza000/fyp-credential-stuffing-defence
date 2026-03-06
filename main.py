@@ -22,6 +22,9 @@ ip_attempts = defaultdict(deque) #{ip: deque ([datetime, datetime, ...])}
 # Signal C : Device consistency tracking
 known_devices = defaultdict(set) #{username: {user_agent_fingerprint}}
 
+# Signal D : Geolocation consistency tracking
+known_countries = defaultdict(set)  # {username: {country}}
+
 def prune_old_attempts(ip: str, now: datetime) -> None:
     """Remove timestamps older than our time window."""
     cutoff = now - timedelta(seconds = IP_WINDOW_SECONDS)
@@ -30,6 +33,27 @@ def prune_old_attempts(ip: str, now: datetime) -> None:
     while q and q[0] < cutoff:
         q.popleft()
 
+
+# ------------------------------------
+# Simple IP → Country mapping (MVP)
+# ------------------------------------
+
+def get_country_from_ip(ip: str) -> str:
+    """
+    Simulated geolocation resolver.
+    Real systems would use a GeoIP database.
+    """
+
+    if ip.startswith("127."):
+        return "LOCAL"
+    elif ip.startswith("192."):
+        return "UK"
+    elif ip.startswith("10."):
+        return "US"
+    else:
+        return "UNKNOWN"
+
+
 def calculate_risk(ip: str, user_agent: str, username: str) -> tuple [int, list[str]]:
     """
     Returns (score, reasons)
@@ -37,20 +61,20 @@ def calculate_risk(ip: str, user_agent: str, username: str) -> tuple [int, list[
     - Signal A: IP login rate
     - Signal B: User-Agent sanity
     - Signal C: Device consistency (new device detection)
+    - Signal D: Geolocation anomaly
     """
     now = datetime.utcnow()
 
     score = 0
     reasons = []
 
-    # Signal A: IP Login rate (velocity)---
+    # Signal A: IP Login rate (velocity)
     prune_old_attempts(ip, now)
     ip_attempts[ip].append(now)
     attempts_in_window = len(ip_attempts[ip])
 
-    
     if attempts_in_window > IP_RATE_THRESHOLD:
-        score += 15
+        score += 10
         reasons.append(f"High IP velocity: {attempts_in_window} attempts/{IP_WINDOW_SECONDS}s")
 
     # Signal B: User-Agent sanity
@@ -67,28 +91,44 @@ def calculate_risk(ip: str, user_agent: str, username: str) -> tuple [int, list[
             score += 3
             reasons.append("Likely scripted User-Agent")
 
-#------------------------------------
-# Signal C: Device Consistency
-#----------------------------------
-#Simple MVP fingerprint = User-Agent String
+    #------------------------------------
+    # Signal C: Device Consistency
+    #------------------------------------
 
     if username and ua_lower :
         if ua_lower not in known_devices[username]:
             score += 5
             reasons.append("New device/User-Agent detected for this user")
             known_devices[username].add(ua_lower)
+
+    #------------------------------------
+    # Signal D: Geolocation anomaly
+    #------------------------------------
+
+    country = get_country_from_ip(ip)
+
+    if username:
+        if country not in known_countries[username]:
+            score += 7
+            reasons.append(f"New country detected: {country}")
+            known_countries[username].add(country)
+
     return score, reasons
+
 
 def score_to_decision(score: int) -> str:
 
-    """MVP decision mapping."""
+    """MVP decision mapping with MFA tier."""
 
     if score < 5:
         return "ALLOW"
-    elif score < 15:
+    elif score < 10:
         return "CHALLENGE"
+    elif score < 20:
+        return "MFA_REQUIRED"
     else:
         return "BLOCK"
+
 
 #Endpoints
 @app.on_event("startup")
@@ -118,29 +158,44 @@ async def login(data: LoginRequest, request: Request):
     )
 
 #---------------------
-# Adaptive Mitigation Enfrocement
+# Adaptive Mitigation Enforcement
 # --------------------
     if decision == "BLOCK":
-    #High-risk attempt: reject completely
         raise HTTPException(
             status_code=403,
             detail={
                 "message": "Blocked suspicious login attempt",
+                "username": data.username,
+                "ip_address": ip,
+                "user_agent": user_agent if user_agent else "unknown",
                 "risk_score": score,
-                "reasons": reasons
-                }
+                "reasons": reasons,
+                "decision": decision 
+            }
         )  
   
     if decision == "CHALLENGE":
-    # Medium-risk attempt: require CAPTCHA (stub for MVP)
         return {
         "message": "Challenge required (CAPTCHA placeholder)",
         "username": data.username,
+        "ip_address": ip,
+        "user_agent": user_agent if user_agent else "unknown",
         "risk_score": score,
         "reasons": reasons,
         "decision": decision
     }
     
+    if decision == "MFA_REQUIRED":
+        return {
+        "message": "Multi-Factor Authentication required (OTP placeholder)",
+        "username": data.username,
+        "ip_address": ip,
+        "user_agent": user_agent if user_agent else "unknown",
+        "risk_score": score,
+        "reasons": reasons,
+        "decision": decision
+    }
+
     return {
         "username": data.username,
         "ip_address": ip,
