@@ -3,9 +3,18 @@ venv/
 #python cache
 __pycache__/
 *.pyc
+*$py.class
 
 #Databases
 *.db
+
+#Environment variables
+.env
+.env.*
+
+#Logs / temp
+*.log
+*.tmp
 
 #VS Code settings
 .vscode/
