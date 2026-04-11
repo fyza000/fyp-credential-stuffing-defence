@@ -118,9 +118,8 @@ if __name__ == "__main__":
     )
     results["Scripted Bot"] = (bot, True)
 
-    print("\n============================")
-    print("Evaluation Summary")
-    print("============================")
+    print("\nSimulation Results\n")
+    
 
     for name, ((decisions, scores, latencies), is_attack) in results.items():
         metrics = calculate_metrics(decisions, is_attack)
