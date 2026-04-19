@@ -1,75 +1,97 @@
-# Final Year Project – Development Journal
+# Development Journal – Credential Stuffing MVP
+## November 2025: Research & Planning
+### Completed
+- Reviewed credential stuffing attack methods and account takeover risks
+- Studied academic and industry sources including OWASP, Cloudflare, Verizon, and Akamai reports
+- Compared traditional defences such as CAPTCHA, IP blocking, rate limiting, and MFA
+- Defined project scope as a lightweight behavioural detection system suitable for smaller organisations
+### Key Decisions
+- Selected a rule-based scoring model instead of machine learning for transparency and easier implementation
+- Chose to use only non-sensitive contextual signals to reduce privacy concerns
+### Issues
+- Needed to balance strong detection capability with low friction for legitimate users
 
----
+## Late November – December 2025: Architecture & Design
+### Completed
+- Designed FastAPI backend architecture for real-time login evaluation
+- Planned `/login` endpoint for risk assessment and `/events` endpoint for viewing logs
+- Defined mitigation actions: ALLOW, CHALLENGE, MFA_REQUIRED, and BLOCK
+- Designed initial scoring thresholds and risk evaluation flow
+### Decisions
+- Selected four behavioural signals:
+  - IP velocity
+  - User-Agent anomaly detection
+  - Device consistency
+  - Geolocation anomaly
 
-## Phase 1 – Research and Design
-**Focus:** Literature review, problem analysis, and system design  
+### Notes
+- Prioritised modular design so the prototype could be extended later
 
-### Progress
-- Completed background research on credential stuffing attacks  
-- Reviewed academic and industry literature  
-- Identified limitations of traditional defence mechanisms  
-- Defined system scope and selected behavioural risk signals  
-- Designed initial system architecture and rule-based scoring approach  
+## December 2025 – January 2026: Core Implementation
 
-### Challenges
-- Balancing detection accuracy with user privacy constraints  
-- Designing scoring thresholds that minimise false positives  
+### Completed
+- Built `auth_service.py` as the main authentication API
+- Implemented `calculate_risk()` scoring logic
+- Added mitigation decision engine based on cumulative risk score
+- Added in-memory state tracking for recent IP and device behaviour
+
+### Issues
+- Initial thresholds were too aggressive and triggered MFA too often
+- Some legitimate first-time users received higher scores due to no previous behavioural history
+
+### Fixes
+- Adjusted thresholds after scenario testing to reduce unnecessary friction
+- Refined signal weights to better separate normal and suspicious behaviour
 
 ### Outcome
-- Established foundation for a multi-signal risk-based authentication system  
-- Defined key signals: IP velocity, User-Agent analysis, device consistency, and geolocation  
+- Working prototype capable of evaluating login attempts in real time
 
----
+## January 2026: Logging & Database
+### Completed
+- Added SQLite database for authentication event storage
+- Implemented `db.py` for table creation and logging functions
+- Built `/events` endpoint to retrieve stored login activity
 
-## Phase 2 – Implementation (Core Prototype)
-**Focus:** Development of MVP credential stuffing detection system  
-
-### Progress
-- Implemented FastAPI backend with `/login` endpoint  
-- Developed rule-based risk scoring engine:
-  - Signal A: IP velocity tracking  
-  - Signal B: User-Agent anomaly detection  
-  - Signal C: Device consistency detection  
-  - Signal D: Geolocation anomaly detection  
-- Implemented adaptive mitigation logic (ALLOW, CHALLENGE, MFA_REQUIRED, BLOCK)  
-- Integrated SQLite database for logging login events  
-- Created `/events` endpoint for retrieving stored logs  
-
-### Challenges
-- Selecting appropriate scoring thresholds  
-- Avoiding excessive false positives for legitimate users  
-- Maintaining simplicity while ensuring meaningful detection  
+### Decisions
+- Selected SQLite over Redis/PostgreSQL for simplicity, lightweight deployment, and sufficient prototype-scale performance
 
 ### Outcome
-- Fully functional prototype capable of detecting and responding to suspicious login behaviour  
-- Modular system design allowing further extension  
+- Persistent event logs available for testing and evaluation
 
----
+## February 2026: Testing & Evaluation
 
-## Phase 3 – Evaluation and Testing
-**Focus:** System evaluation using synthetic traffic  
-
-### Progress
-- Developed synthetic traffic generator for controlled testing  
+### Completed
+- Built `attack_simulator.py` to generate synthetic traffic
 - Simulated multiple scenarios:
-  - Legitimate user behaviour  
-  - High-frequency credential stuffing attacks  
-  - Scripted bot activity using custom User-Agent  
-- Collected performance metrics:
-  - Detection rate  
-  - False positive rate  
-  - Response latency  
+  - Legitimate user behaviour
+  - Burst credential stuffing attacks
+  - Scripted bot traffic using suspicious User-Agent strings
 
-### Challenges
-- Ensuring realistic simulation of attack behaviour  
-- Interpreting results in the absence of real-world datasets  
+### Metrics Collected
+- Detection rate
+- False positive rate
+- Average response latency
+- Mitigation decisions triggered
 
-### Outcome
-- Validated effectiveness of multi-signal risk scoring approach  
-- Identified system limitations and areas for improvement  
+### Findings
+- Legitimate users experienced low friction and no direct blocking
+- Suspicious scenarios triggered MFA or BLOCK responses
+- Average response times remained low during testing
 
----
+## March – April 2026: Final Refinement & Report Writing
 
-## Overall Reflection
-The project progressed from theoretical research to a fully implemented and evaluated prototype. The iterative approach allowed continuous refinement of the scoring logic and system design. While the system demonstrates effective detection capabilities, limitations such as in-memory state management and simplified geolocation highlight opportunities for future enhancement.
+### Completed
+- Reviewed threshold behaviour and tuning decisions
+- Generated graphs and tables for the evaluation chapter
+- Documented implementation, findings, and limitations
+- Prepared appendices with technical evidence and proposal updates
+- Completed proofreading, formatting, and reference checks
+
+### Notes
+- Focus shifted toward clarity of documentation and alignment with assessment criteria
+
+## Final Reflection
+
+The project progressed from initial research into a fully implemented and evaluated prototype. An iterative development approach allowed continuous refinement of thresholds, scoring logic, and mitigation behaviour. The final system demonstrated that lightweight behavioural risk scoring can help reduce credential stuffing attempts while maintaining acceptable usability for legitimate users.
+
+Limitations identified included in-memory state management, simplified geolocation logic, and cold-start behaviour where first-time users may receive higher friction. Future improvements include persistent behavioural profiles, real geolocation intelligence, and adaptive threshold optimisation.
