@@ -55,12 +55,12 @@ venv\Scripts\activate
 pip install -r requirements.txt
 ```
 ### 4. Run the Application
-Uvicorn auth_service:app --reload
+uvicorn auth_service:app --reload
 
 ### 5. Access the API
 -Swagger UI: http://127.0.0.1:8000/docs
--Login endpoint:  http://127.0.0.1:8000/docs
--Events endpoint:  http://127.0.0.1:8000/docs
+-Login endpoint:  POST /login
+-Events endpoint: Get /events
 
 ### Evaluation
 The prototype can be tested using the synthetic traffic generator: attack_simulator.py
