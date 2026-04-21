@@ -1,15 +1,13 @@
 """
 Synthetic Traffic Generator for Evaluation
--------------------------------------------
+
 This script generates controlled login traffic against the local
 credential stuffing defence system.
 
-- All traffic is directed to localhost (127.0.0.1)
-- No real credentials are used
-- No external systems are involved
+All traffic is directed to localhost (127.0.0.1)
+No real credentials are used
 
 """
-
 import requests
 import time
 from collections import Counter

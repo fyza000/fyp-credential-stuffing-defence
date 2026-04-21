@@ -53,6 +53,8 @@ def get_country_from_ip(ip: str) -> str:
     else:
         return "UNKNOWN"
 
+ # Main risk engine combining multiple behavioural signals
+ # Returns cumulative score and reasons for transparency
 
 def calculate_risk(ip: str, user_agent: str, username: str) -> tuple [int, list[str]]:
     """
@@ -69,6 +71,7 @@ def calculate_risk(ip: str, user_agent: str, username: str) -> tuple [int, list[
     reasons = []
 
     # Signal A: IP Login rate (velocity)
+    # Detect rapid repeated attempts from same IP address
     prune_old_attempts(ip, now)
     ip_attempts[ip].append(now)
     attempts_in_window = len(ip_attempts[ip])
@@ -78,7 +81,7 @@ def calculate_risk(ip: str, user_agent: str, username: str) -> tuple [int, list[
         reasons.append(f"High IP velocity: {attempts_in_window} attempts/{IP_WINDOW_SECONDS}s")
 
     # Signal B: User-Agent sanity
-
+    # Detect missing or suspicious automated client headers
     ua = (user_agent or "").strip()
 
     if not ua:
@@ -91,9 +94,9 @@ def calculate_risk(ip: str, user_agent: str, username: str) -> tuple [int, list[
             score += 3
             reasons.append("Likely scripted User-Agent")
 
-    #------------------------------------
+    
     # Signal C: Device Consistency
-    #------------------------------------
+    # Flag first-seen devices for a username as higher risk
 
     if username and ua_lower :
         if ua_lower not in known_devices[username]:
@@ -101,9 +104,8 @@ def calculate_risk(ip: str, user_agent: str, username: str) -> tuple [int, list[
             reasons.append("New device/User-Agent detected for this user")
             known_devices[username].add(ua_lower)
 
-    #------------------------------------
+    
     # Signal D: Geolocation anomaly
-    #------------------------------------
 
     country = get_country_from_ip(ip)
 
@@ -115,6 +117,7 @@ def calculate_risk(ip: str, user_agent: str, username: str) -> tuple [int, list[
 
     return score, reasons
 
+# Convert risk score into adaptive authentication response
 
 def score_to_decision(score: int) -> str:
 
@@ -130,7 +133,7 @@ def score_to_decision(score: int) -> str:
         return "BLOCK"
 
 
-#Endpoints
+# Endpoints
 @app.on_event("startup")
 def on_startup() -> None:
     init_db()
@@ -147,7 +150,8 @@ async def login(data: LoginRequest, request: Request):
     score, reasons = calculate_risk(ip=ip, user_agent = user_agent,username = data.username)
     decision = score_to_decision(score)
 
-#SQLite logging (MVP evidence)
+   # store event data audit trail and later evaluation
+   # SQLite logging (MVP evidence)
     log_event(
         username=data.username,
         ip=ip,
@@ -157,9 +161,8 @@ async def login(data: LoginRequest, request: Request):
         reasons = reasons,
     )
 
-#---------------------
 # Adaptive Mitigation Enforcement
-# --------------------
+
     if decision == "BLOCK":
         raise HTTPException(
             status_code=403,
@@ -208,3 +211,4 @@ async def login(data: LoginRequest, request: Request):
 @app.get("/events")
 def events(limit: int = 20):
     return {"events": latest_events(limit=limit)}
+    
